@@ -77,7 +77,7 @@ jobs:
             const t='}))})(window,window.document,jQuery);';
             const nt=`}))\nif (typeof window.modSC2DataManager !== 'undefined') { window.modSC2DataManager.startInit().then(() => window.jsPreloader.startLoad()).then(() => {window.mainStart();if(typeof window.initI10n==='function')window.initI10n(l10nStrings);}).catch(err=>console.error(err)); } else { window.mainStart();if(typeof window.initI10n==='function')window.initI10n(l10nStrings); }\n})(window,window.document,jQuery);`;
             if(!js.includes(h)||!js.includes(t)) throw Error('v0.775 SugarCube startup markers missing');
-            sc.html(js.split(h).join('window.SugarCube={},window.mainStart=((()=>{')).split(t).join(nt));
+            sc.html(js.split(h).join('window.SugarCube={},window.mainStart=((()=>{').split(t).join(nt));
           }
           fs.writeFileSync('../final.html',$.root().html(),'utf8');
           JS
