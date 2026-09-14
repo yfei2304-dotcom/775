@@ -1,0 +1,37 @@
+name: Publish DoLP v0.775 at project root
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-v0775-root.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dolp-v0775-root
+  cancel-in-progress: true
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Move published v0775 site to Pages root
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin gh-pages:gh-pages
+          git worktree add /tmp/pages-root gh-pages
+          test -f /tmp/pages-root/v0775/index.html
+          test -f /tmp/pages-root/v0775/sw.js
+          test -f /tmp/pages-root/v0775/payload/game-v0775.bundle
+          test -d /tmp/pages-root/v0775/img
+          rm -rf /tmp/pages-root/index.html /tmp/pages-root/sw.js /tmp/pages-root/pako_inflate.min.js /tmp/pages-root/style.css /tmp/pages-root/usettings.js /tmp/pages-root/modList.json /tmp/pages-root/manifest.json /tmp/pages-root/icon-192.png /tmp/pages-root/apple-touch-icon.png /tmp/pages-root/build-info.json /tmp/pages-root/payload /tmp/pages-root/img
+          cp -a /tmp/pages-root/v0775/. /tmp/pages-root/
+          rm -rf /tmp/pages-root/v0775
+          touch /tmp/pages-root/.nojekyll
+          git -C /tmp/pages-root add -A
+          git -C /tmp/pages-root -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Publish DoLP v0.775 at Pages root'
+          git -C /tmp/pages-root push origin HEAD:gh-pages
