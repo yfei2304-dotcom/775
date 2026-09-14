@@ -70,7 +70,9 @@ jobs:
           npm install --silent cheerio@1.0.0-rc.12
           cat > patch.js <<'JS'
           const fs=require('fs'),$=require('cheerio').load(fs.readFileSync('../merged.html','utf8'),{decodeEntities:false});
-          const sc=$('#script-sugarcube[type="text/javascript"]'); if(sc.length!==1) throw Error('SugarCube script count '+sc.length);
+          const candidates=$('#script-sugarcube[type="text/javascript"]');
+          const sc=candidates.filter((i,el)=>($(el).html()||'').includes('window.SugarCube')).last();
+          if(sc.length!==1) throw Error('SugarCube script count/target '+candidates.length+'/'+sc.length);
           let js=sc.html()||'';
           if(!(js.includes('window.mainStart=((()=>{')&&js.includes('window.modSC2DataManager.startInit()'))){
             const h='window.SugarCube={},jQuery((()=>{';
