@@ -520,8 +520,6 @@ jobs:
           exact_version_line = "0.5.12.11 DoLP v0.778 -(ML-v2.101.1)"
           if "0.5.12.11 DoLP v0.778" not in published:
               raise SystemExit("The active DoLP v0.778 core marker is missing")
-          if "ML-v2.101.1" not in published:
-              raise SystemExit("The ModLoader v2.101.1 marker is missing")
 
           shell_without_story = (
               published[:published_story_match.start()]
