@@ -30,6 +30,6 @@
     "mergedHtmlSha256": "71f059154aed17db2ea01460f2826766e0a66ff998f48f7da83dd5a4309bcfd1"
   },
   "deployment": "direct index.html with ModLoader; no Service Worker or compressed web launcher",
-  "sourceCommit": "a36ee04aa8ef3220d96031fab9f8a0e19eac7db1",
-  "publishedAt": "2026-09-15T17:26:55.193601+00:00"
+  "sourceCommit": "b9dba31b92b299cf66cecb0aeaea4d0100ed1728",
+  "publishedAt": "2026-09-15T17:28:03.131997+00:00"
 }
