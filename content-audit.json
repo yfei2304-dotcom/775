@@ -1,0 +1,68 @@
+{
+  "result": "pass",
+  "version": "DoLP v0.778",
+  "core": "0.5.12.11 DoLP v0.778",
+  "edition": "Aoki Utage + Mysterious",
+  "activeVersionLine": "0.5.12.11 DoLP v0.778 -(ML-v2.101.1)",
+  "package": {
+    "bytes": 125324567,
+    "sha256": "67e21e9615d94783df26c3e1dfebf51840cb68278e419606ea69052564a0da51",
+    "matchesPinnedV0778": true
+  },
+  "gameHtml": {
+    "bytes": 57188965,
+    "sha256": "6144728ebb7d47ddc2ee861281ddfadd161d1bf67babf6cc59510de1a28ca6ef",
+    "matchesPinnedV0778": true
+  },
+  "storyData": {
+    "bytes": 56034653,
+    "sha256": "a611e725d00a4fc88d7e2fcc729c8422d632a61a8674ba902d13bce3053cfeda",
+    "byteIdenticalToOfficialV0778": true,
+    "officialHistoryMentions": {
+      "DoLP v0.772": 0,
+      "DoLP v0.775": 0
+    }
+  },
+  "modLoader": {
+    "version": "ML v2.101.1",
+    "targetCore": "0.5.12.11",
+    "archiveSha256": "5f02311487aa0acbaa834f1c8a284328861c9e464a4d39a8ea56efe2cefddfdc",
+    "officialBlocks": 2,
+    "eachBlockOccursOnce": true,
+    "sugarCubeEngines": 1
+  },
+  "images": {
+    "files": 31349,
+    "bytes": 143622449,
+    "manifestSha256": "adb24df500b0338a4a171c82a9956e8cc467ef905aef9df64a87e19862888792",
+    "sourceManifestSha256": "adb24df500b0338a4a171c82a9956e8cc467ef905aef9df64a87e19862888792",
+    "byteIdenticalToOfficialV0778": true
+  },
+  "publishedTree": {
+    "rootEntriesBeforeAuditReport": [
+      ".nojekyll",
+      "apple-touch-icon.png",
+      "build-info.json",
+      "icon-192.png",
+      "img",
+      "index.html",
+      "manifest.json",
+      "modList.json",
+      "style.css",
+      "usettings.js",
+      "version.txt"
+    ],
+    "legacyVersionPaths": [],
+    "legacyActiveShellMarkers": {
+      "DoLP v0.768": 0,
+      "DoLP v0.772": 0,
+      "DoLP v0.775": 0,
+      "game-v0768": 0,
+      "game-v0772": 0,
+      "game-v0775": 0,
+      "v0768": 0,
+      "v0772": 0,
+      "v0775": 0
+    }
+  }
+}

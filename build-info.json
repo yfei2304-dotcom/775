@@ -8,8 +8,8 @@
   "packageSha256": "67e21e9615d94783df26c3e1dfebf51840cb68278e419606ea69052564a0da51",
   "upstreamHtmlBytes": 57188965,
   "upstreamHtmlSha256": "6144728ebb7d47ddc2ee861281ddfadd161d1bf67babf6cc59510de1a28ca6ef",
-  "publishedHtmlBytes": 71650528,
-  "publishedHtmlSha256": "eb2779e47a86340a0bf038dfec5a8526f3ae64d1d86508067bd2289626653e19",
+  "publishedHtmlBytes": 71650331,
+  "publishedHtmlSha256": "bde108e286773697fb9f558f33819531e1fdeb9a230c730565c9ae55295265c7",
   "imageFiles": 31349,
   "imageBytes": 143622449,
   "modLoader": "ML v2.101.1",
@@ -30,6 +30,6 @@
     "mergedHtmlSha256": "71f059154aed17db2ea01460f2826766e0a66ff998f48f7da83dd5a4309bcfd1"
   },
   "deployment": "direct index.html with ModLoader; no Service Worker or compressed web launcher",
-  "sourceCommit": "7e042a787d2c509bb9a8e14437a54e76af1e6c3c",
-  "publishedAt": "2026-09-15T10:39:20.813771+00:00"
+  "sourceCommit": "07efd306e58b10a4f3650397135b33eebac8877c",
+  "publishedAt": "2026-09-15T10:59:43.686839+00:00"
 }
