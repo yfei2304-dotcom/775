@@ -366,6 +366,124 @@ jobs:
           )
           PY
 
+      - name: Run the ModLoader in a mobile browser smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_SERVER_PID=''
+          cleanup() {
+            if test -n "$TEST_SERVER_PID"; then
+              kill "$TEST_SERVER_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory "$SITE_DIR" > "$BUILD_DIR/http-server.log" 2>&1 &
+          TEST_SERVER_PID="$!"
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error 'http://127.0.0.1:4173/build-info.json' >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent --show-error 'http://127.0.0.1:4173/build-info.json' >/dev/null
+
+          CHROME_BIN="$(command -v google-chrome || command -v chromium-browser || command -v chromium)"
+          test -n "$CHROME_BIN"
+
+          mkdir -p "$BUILD_DIR/runtime-check"
+          cd "$BUILD_DIR/runtime-check"
+          npm init -y >/dev/null 2>&1
+          npm install --silent --no-save playwright-core@1.55.0
+
+          CHROME_BIN="$CHROME_BIN" node - <<'JS'
+          const { chromium } = require("playwright-core");
+
+          (async () => {
+            const browser = await chromium.launch({
+              executablePath: process.env.CHROME_BIN,
+              headless: true,
+              args: [
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--js-flags=--max-old-space-size=4096",
+              ],
+            });
+            const context = await browser.newContext({
+              viewport: { width: 390, height: 844 },
+              deviceScaleFactor: 3,
+              isMobile: true,
+              hasTouch: true,
+              userAgent:
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
+                "Mobile/15E148 Safari/604.1",
+            });
+            const page = await context.newPage();
+            const pageErrors = [];
+            const consoleErrors = [];
+            page.on("pageerror", error => pageErrors.push(String(error)));
+            page.on("console", message => {
+              if (message.type() === "error") consoleErrors.push(message.text());
+            });
+
+            await page.goto("http://127.0.0.1:4173/", {
+              waitUntil: "domcontentloaded",
+              timeout: 120000,
+            });
+            await page.waitForFunction(
+              () => document.body.innerText.includes("ML v2.101.1"),
+              null,
+              { timeout: 120000, polling: 500 }
+            );
+
+            const state = await page.evaluate(() => {
+              const text = document.body.innerText;
+              const versionLines = text
+                .split("\n")
+                .map(line => line.trim())
+                .filter(line => /DoLP v0\.778|ML v2\.101\.1|ModLoader/i.test(line));
+              return {
+                title: document.title,
+                readyState: document.readyState,
+                versionLines,
+                hasV0778: text.includes("0.5.12.11 DoLP v0.778"),
+                hasModLoaderLabel: text.includes("ML v2.101.1"),
+                hasManager: typeof window.modSC2DataManager !== "undefined",
+                hasPreloader: typeof window.jsPreloader !== "undefined",
+                embeddedModZipCount: Array.isArray(window.modDataValueZipList)
+                  ? window.modDataValueZipList.length
+                  : -1,
+                hasStoryInterface: Boolean(
+                  document.querySelector("#story, #passages, #ui-bar")
+                ),
+                hasStartControl: text.includes("Start Game!"),
+              };
+            });
+
+            console.log(JSON.stringify({ state, pageErrors, consoleErrors }, null, 2));
+            if (!state.hasV0778) throw new Error("v0.778 core label did not render");
+            if (!state.hasModLoaderLabel) throw new Error("ML v2.101.1 label did not render");
+            if (!state.hasManager) throw new Error("modSC2DataManager is unavailable");
+            if (!state.hasPreloader) throw new Error("jsPreloader is unavailable");
+            if (state.embeddedModZipCount < 1) throw new Error("Embedded Mod ZIP list is empty");
+            if (!state.hasStoryInterface || !state.hasStartControl) {
+              throw new Error("The playable start interface did not render");
+            }
+            if (pageErrors.length) {
+              throw new Error("Browser page errors: " + pageErrors.join(" | "));
+            }
+
+            await browser.close();
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          JS
+
       - name: Validate the generated website
         shell: bash
         run: |
