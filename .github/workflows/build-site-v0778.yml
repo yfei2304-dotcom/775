@@ -18,7 +18,8 @@ concurrency:
 env:
   DOLP_VERSION: '0.778'
   PACKAGE_URL: 'https://dolp.download/DoLP_aoki_utage_mys/v0.778/DoLP_aoki_utage_mys_v0.778.zip'
-  LOADER_URL: 'https://raw.githubusercontent.com/yfei2304-dotcom/dolp-aoki-mys-modloader/4821046562cad9c3df692bbe7098df441e2fb8a7/payload/game-v0772.bundle'
+  LOADER_URL: 'https://github.com/Lyoko-Jeremie/DoLModLoaderBuild/releases/download/v2.101.1-dol-0.5.12.11-240b837588c6f6ee6b07df0b161aa28f844834b0/DoL-ModLoader-2.101.1-dol-0.5.12.11-240b837588c6f6ee6b07df0b161aa28f844834b0.zip'
+  LOADER_SHA256: '5f02311487aa0acbaa834f1c8a284328861c9e464a4d39a8ea56efe2cefddfdc'
   BUILD_DIR: '/tmp/dolp-v0778-build'
   SITE_DIR: '/tmp/dolp-v0778-site'
   PAGES_DIR: '/tmp/dolp-v0778-pages'
@@ -82,7 +83,7 @@ jobs:
           echo "Image files: $IMAGE_FILES"
           echo "Image bytes: $IMAGE_BYTES"
 
-      - name: Install the pinned ModLoader v2.101.1 runtime
+      - name: Install the official ModLoader v2.101.1 runtime for core 0.5.12.11
         shell: bash
         run: |
           set -euo pipefail
@@ -93,15 +94,69 @@ jobs:
             --retry 5 \
             --retry-all-errors \
             --connect-timeout 30 \
-            --max-time 600 \
+            --max-time 900 \
             --user-agent 'Mozilla/5.0 DoLP ModLoader installer' \
             "$LOADER_URL" \
-            --output "$BUILD_DIR/loader-companion.bundle"
+            --output "$BUILD_DIR/modloader.zip"
 
-          gzip -t "$BUILD_DIR/loader-companion.bundle"
-          gzip -dc "$BUILD_DIR/loader-companion.bundle" > "$BUILD_DIR/loader-companion.html"
+          printf '%s  %s\n' "$LOADER_SHA256" "$BUILD_DIR/modloader.zip" | sha256sum --check -
+          unzip -t "$BUILD_DIR/modloader.zip" >/dev/null
+          mkdir -p "$BUILD_DIR/modloader-unpacked"
+          unzip -q "$BUILD_DIR/modloader.zip" -d "$BUILD_DIR/modloader-unpacked"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import shutil
+
+          build = Path(os.environ["BUILD_DIR"])
+          root = build / "modloader-unpacked"
+          required = (
+              b"0.5.12.11",
+              b"window.modDataValueZipList",
+              b"modSC2DataManager",
+              b"jsPreloader",
+          )
+          candidates = []
+          for path in root.rglob("*"):
+              if not path.is_file() or path.suffix.lower() != ".html":
+                  continue
+              raw = path.read_bytes()
+              lowered_name = path.name.lower()
+              score = sum(200 for marker in required if marker in raw)
+              if lowered_name.endswith(".mod.html"):
+                  score += 100
+              if "polyfill" not in lowered_name:
+                  score += 20
+              candidates.append((score, len(raw), path, raw))
+
+          if not candidates:
+              raise SystemExit("The official ModLoader archive contains no HTML build")
+
+          for score, size, path, raw in sorted(candidates, reverse=True):
+              markers = [marker.decode("ascii") for marker in required if marker in raw]
+              print(f"ModLoader candidate: {path.relative_to(root)} | {size} bytes | score {score} | {markers}")
+
+          compatible = [
+              item for item in candidates
+              if all(marker in item[3] for marker in required)
+          ]
+          if not compatible:
+              raise SystemExit("No ModLoader HTML matches core 0.5.12.11 and the required runtime markers")
+
+          _, _, selected, _ = max(compatible, key=lambda item: (item[0], item[1]))
+          shutil.copyfile(selected, build / "loader-companion.html")
+          (build / "loader-html-name.txt").write_text(
+              str(selected.relative_to(root)) + "\n",
+              encoding="utf-8",
+          )
+          print(f"Selected official ModLoader build: {selected.relative_to(root)}")
+          PY
+
+          grep -aFq '0.5.12.11' "$BUILD_DIR/loader-companion.html"
           grep -aFq 'window.modDataValueZipList' "$BUILD_DIR/loader-companion.html"
           grep -aFq 'modSC2DataManager' "$BUILD_DIR/loader-companion.html"
+          grep -aFq 'jsPreloader' "$BUILD_DIR/loader-companion.html"
 
           python3 - <<'PY'
           from pathlib import Path
@@ -192,6 +247,8 @@ jobs:
           (site / "index.html").write_text(merged, encoding="utf-8")
           report = {
               "modLoader": "ML v2.101.1",
+              "loaderCore": "0.5.12.11",
+              "loaderSourceHtml": (build / "loader-html-name.txt").read_text(encoding="utf-8").strip(),
               "loaderBlocks": len(loader_blocks),
               "loaderCompanionBytes": (build / "loader-companion.html").stat().st_size,
               "loaderCompanionSha256": hashlib.sha256(
@@ -354,6 +411,10 @@ jobs:
               "imageBytes": sum(path.stat().st_size for path in image_paths),
               "modLoader": "ML v2.101.1",
               "loaderSource": os.environ["LOADER_URL"],
+              "loaderArchiveBytes": (build / "modloader.zip").stat().st_size,
+              "loaderArchiveSha256": hashlib.sha256((build / "modloader.zip").read_bytes()).hexdigest(),
+              "loaderArchiveExpectedSha256": os.environ["LOADER_SHA256"],
+              "loaderSourceHtml": (build / "loader-html-name.txt").read_text(encoding="utf-8").strip(),
               "loaderCompanionSha256": hashlib.sha256((build / "loader-companion.html").read_bytes()).hexdigest(),
               "loaderInstall": json.loads((build / "loader-info.json").read_text(encoding="utf-8")),
               "deployment": "direct index.html with ModLoader; no Service Worker or compressed web launcher",
@@ -434,11 +495,16 @@ jobs:
               waitUntil: "domcontentloaded",
               timeout: 120000,
             });
-            await page.waitForFunction(
-              () => document.body.innerText.includes("ML v2.101.1"),
-              null,
-              { timeout: 120000, polling: 500 }
-            );
+            let labelWaitError = null;
+            try {
+              await page.waitForFunction(
+                () => document.body.innerText.includes("ML v2.101.1"),
+                null,
+                { timeout: 180000, polling: 500 }
+              );
+            } catch (error) {
+              labelWaitError = String(error);
+            }
 
             const state = await page.evaluate(() => {
               const text = document.body.innerText;
@@ -464,7 +530,7 @@ jobs:
               };
             });
 
-            console.log(JSON.stringify({ state, pageErrors, consoleErrors }, null, 2));
+            console.log(JSON.stringify({ state, labelWaitError, pageErrors, consoleErrors }, null, 2));
             if (!state.hasV0778) throw new Error("v0.778 core label did not render");
             if (!state.hasModLoaderLabel) throw new Error("ML v2.101.1 label did not render");
             if (!state.hasManager) throw new Error("modSC2DataManager is unavailable");

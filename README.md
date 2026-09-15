@@ -16,9 +16,9 @@ Game and image package:
 
 Pinned ModLoader companion:
 
-`https://raw.githubusercontent.com/yfei2304-dotcom/dolp-aoki-mys-modloader/4821046562cad9c3df692bbe7098df441e2fb8a7/payload/game-v0772.bundle`
+`https://github.com/Lyoko-Jeremie/DoLModLoaderBuild/releases/download/v2.101.1-dol-0.5.12.11-240b837588c6f6ee6b07df0b161aa28f844834b0/DoL-ModLoader-2.101.1-dol-0.5.12.11-240b837588c6f6ee6b07df0b161aa28f844834b0.zip`
 
-The workflow extracts only the verified ModLoader runtime blocks from the existing v0.772 build and installs them into the genuine v0.778 SugarCube startup sequence. It does not replace the v0.778 game core or its Aoki Utage + Mysterious assets.
+The workflow verifies the official archive SHA-256 (`5f02311487aa0acbaa834f1c8a284328861c9e464a4d39a8ea56efe2cefddfdc`), extracts the ModLoader runtime built specifically for DoL core `0.5.12.11`, and installs those blocks into the genuine DoLP v0.778 SugarCube startup sequence. It does not replace the v0.778 game core or its Aoki Utage + Mysterious assets.
 
 The game is published directly as `index.html`. It does not depend on the obsolete v0.775 Service Worker, compressed web payload, or redirect launcher that caused the blank page on iOS.
 
