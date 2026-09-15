@@ -1,1 +1,1 @@
-// v0.775 site user-settings hook.
+// Optional SugarCube user-settings hook.

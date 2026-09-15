@@ -1,1 +1,18 @@
-{"site":"dolp-aoki-mys-modloader/v0775","build":"official775-3cf862f66210","core":"0.5.12.8 DoLP v0.775","source":"official v0.775 Aoki+Mysterious package","loaderSource":"runtime companion extracted from existing ModLoader site; it does not replace the v0.775 game core or asset set","officialZipBytes":124880447,"officialZipSha256":"d01a0d8b4c6f3a87c10a8562425f4480b82e44d39da55aba9b418d063bc7a40b","officialHtmlBytes":57183948,"officialHtmlSha256":"03429d6e83de699cd5b13225f14789c4444c508fe52352b60c7b252eb53242cb","officialImageFiles":31153,"officialImageBytes":143008912","safari":"manifest + apple-touch-icon + scoped service worker","publishedAt":"2026-09-14T15:51:02Z"}
+{
+  "version": "DoLP v0.778",
+  "edition": "Aoki Utage + Mysterious",
+  "source": "https://dolp.download/DoLP_aoki_utage_mys/v0.778/DoLP_aoki_utage_mys_v0.778.zip",
+  "sourceHtml": "Degrees of Lewdity.html",
+  "core": "0.5.12.11 DoLP v0.778",
+  "packageBytes": 125324567,
+  "packageSha256": "67e21e9615d94783df26c3e1dfebf51840cb68278e419606ea69052564a0da51",
+  "upstreamHtmlBytes": 57188965,
+  "upstreamHtmlSha256": "6144728ebb7d47ddc2ee861281ddfadd161d1bf67babf6cc59510de1a28ca6ef",
+  "publishedHtmlBytes": 57189965,
+  "publishedHtmlSha256": "6c87c075cb196046f0eba782195fca12f0fe05d0a7864ec81f8d178cf3494ee6",
+  "imageFiles": 31349,
+  "imageBytes": 143622449,
+  "deployment": "direct index.html; no Service Worker or compressed loader",
+  "sourceCommit": "a92445900920a76cc30b7d5db0974470e25ebb2b",
+  "publishedAt": "2026-09-15T10:03:45.073144+00:00"
+}
