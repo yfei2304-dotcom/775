@@ -302,8 +302,10 @@ jobs:
           from pathlib import Path
           from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
           import hashlib
+          import html as html_module
           import json
           import os
+          import re
 
           from opencc import OpenCC
 
@@ -315,7 +317,7 @@ jobs:
           converter = OpenCC("s2twp")
           source_url = os.environ["I18N_SOURCE_URL"]
           license_url = "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/blob/main/LICENSE"
-          target_version = "v0.5.12.11-zhtw-1.0.0"
+          target_version = "v0.5.12.11-zhtw-1.0.1"
           text_suffixes = {".css", ".js", ".json", ".md", ".txt"}
 
           def sha256_bytes(value):
@@ -386,6 +388,86 @@ jobs:
                   if source_i18n_text.count(token) != translated_i18n_text.count(token):
                       raise SystemExit(f"Traditional conversion changed structural token count: {token}")
 
+              # The community translation targets upstream DoL. DoLP changes the
+              # position of many otherwise identical strings and replaces a small
+              # number of them. ModI18N normally rolls back an entire passage when
+              # one positional match fails, so adapt every retained rule to the
+              # exact v0.778 content and omit only rules whose English source no
+              # longer exists. This keeps DoLP additions intact and prevents tens
+              # of thousands of expensive fuzzy-match failures on mobile Safari.
+              upstream = (build / "upstream.html").read_text(encoding="utf-8-sig")
+              passages = {}
+              for match in re.finditer(
+                  r'<tw-passagedata\b([^>]*)>(.*?)</tw-passagedata>',
+                  upstream,
+                  flags=re.DOTALL,
+              ):
+                  name_match = re.search(r'\bname="([^"]*)"', match.group(1))
+                  if name_match:
+                      passages[html_module.unescape(name_match.group(1))] = html_module.unescape(match.group(2))
+
+              def split_tweego_files(kind, closing_tag):
+                  marker = re.compile(r'/\* ' + kind + r' #\d+: "([^"]+)" \*/')
+                  matches = list(marker.finditer(upstream))
+                  files = {}
+                  for index, match in enumerate(matches):
+                      end = matches[index + 1].start() if index + 1 < len(matches) else upstream.find(closing_tag, match.end())
+                      if end < 0:
+                          raise SystemExit(f"Cannot find {closing_tag} after {match.group(1)}")
+                      files[match.group(1).rsplit("/", 1)[-1]] = upstream[match.end():end]
+                  return files
+
+              scripts = split_tweego_files("twine-user-script", "</script>")
+              styles = split_tweego_files("twine-user-stylesheet", "</style>")
+
+              def find_nearest(source, needle, hint):
+                  if not source or not needle:
+                      return None
+                  positions = []
+                  start = 0
+                  while True:
+                      found = source.find(needle, start)
+                      if found < 0:
+                          break
+                      positions.append(found)
+                      start = found + max(1, len(needle))
+                  return min(positions, key=lambda value: abs(value - hint)) if positions else None
+
+              retained = 0
+              omitted = 0
+              repositioned = 0
+              for group_name, entries in list(translated_data["typeB"].items()):
+                  compatible = []
+                  for entry in entries:
+                      if entry.get("pN"):
+                          container = passages.get(entry["pN"])
+                      elif entry.get("js"):
+                          container = scripts.get(entry.get("fileName"))
+                      elif entry.get("css"):
+                          container = styles.get(entry.get("fileName"))
+                      else:
+                          container = None
+                      actual = find_nearest(container, entry.get("f", ""), entry.get("pos", 0))
+                      if actual is None:
+                          omitted += 1
+                          continue
+                      if actual != entry.get("pos"):
+                          repositioned += 1
+                          entry["pos"] = actual
+                      compatible.append(entry)
+                  translated_data["typeB"][group_name] = compatible
+                  retained += len(compatible)
+
+              if retained < 190000 or omitted > 2000:
+                  raise SystemExit(f"Unexpected DoLP compatibility result: retained={retained}, omitted={omitted}")
+              translated_i18n_text = json.dumps(
+                  translated_data,
+                  ensure_ascii=False,
+                  separators=(",", ":"),
+              )
+              if "開始遊戲！" not in translated_i18n_text:
+                  raise SystemExit("DoLP-compatible rules lost the Traditional start control")
+
               with ZipFile(output_path, "w", compression=ZIP_DEFLATED, compresslevel=9) as output:
                   for info in archive.infolist():
                       if info.is_dir():
@@ -454,6 +536,9 @@ jobs:
               "targetBytes": output_path.stat().st_size,
               "targetSha256": sha256_bytes(output_path.read_bytes()),
               "translationEntries": len(source_entries),
+              "compatibleEntries": retained,
+              "incompatibleEntriesOmitted": omitted,
+              "positionsAdaptedForDoLP": repositioned,
               "translatedTargets": translated_targets,
               "targetsChangedToTraditional": changed_targets,
               "startControl": "開始遊戲！",
