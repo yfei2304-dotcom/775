@@ -8,11 +8,22 @@
   "packageSha256": "67e21e9615d94783df26c3e1dfebf51840cb68278e419606ea69052564a0da51",
   "upstreamHtmlBytes": 57188965,
   "upstreamHtmlSha256": "6144728ebb7d47ddc2ee861281ddfadd161d1bf67babf6cc59510de1a28ca6ef",
-  "publishedHtmlBytes": 57189965,
-  "publishedHtmlSha256": "6c87c075cb196046f0eba782195fca12f0fe05d0a7864ec81f8d178cf3494ee6",
+  "publishedHtmlBytes": 72028131,
+  "publishedHtmlSha256": "d7f1e6ce3aad01294bb0e81f034bef92c1524e0b5b12e6ab60587cb41774d36f",
   "imageFiles": 31349,
   "imageBytes": 143622449,
-  "deployment": "direct index.html; no Service Worker or compressed loader",
-  "sourceCommit": "a92445900920a76cc30b7d5db0974470e25ebb2b",
-  "publishedAt": "2026-09-15T10:03:45.073144+00:00"
+  "modLoader": "ML v2.101.1",
+  "loaderSource": "https://raw.githubusercontent.com/yfei2304-dotcom/dolp-aoki-mys-modloader/4821046562cad9c3df692bbe7098df441e2fb8a7/payload/game-v0772.bundle",
+  "loaderCompanionSha256": "6e792d8fd8992e74df8906b091495abc61582602e8d88eb6b32680e94635ef8d",
+  "loaderInstall": {
+    "modLoader": "ML v2.101.1",
+    "loaderBlocks": 3,
+    "loaderCompanionBytes": 68512914,
+    "loaderCompanionSha256": "6e792d8fd8992e74df8906b091495abc61582602e8d88eb6b32680e94635ef8d",
+    "mergedHtmlBytes": 72027131,
+    "mergedHtmlSha256": "c6227c0bbc8775eefb69c23678782fe9bd3c400b261df1b18a7ba9b1eae37ee6"
+  },
+  "deployment": "direct index.html with ModLoader; no Service Worker or compressed web launcher",
+  "sourceCommit": "eefbabfb6f9cfb60cae3655f43048df631f46c31",
+  "publishedAt": "2026-09-15T10:18:25.486090+00:00"
 }
