@@ -26,10 +26,6 @@ env:
   EXPECTED_IMAGE_BYTES: '143622449'
   LOADER_URL: 'https://github.com/Lyoko-Jeremie/DoLModLoaderBuild/releases/download/v2.101.1-dol-0.5.12.11-240b837588c6f6ee6b07df0b161aa28f844834b0/DoL-ModLoader-2.101.1-dol-0.5.12.11-240b837588c6f6ee6b07df0b161aa28f844834b0.zip'
   LOADER_SHA256: '5f02311487aa0acbaa834f1c8a284328861c9e464a4d39a8ea56efe2cefddfdc'
-  I18N_SOURCE_URL: 'https://github.com/NumberSir/DoL-I18n-Build/releases/download/0.5.12.11-chs-auto-nightly-auto--d230276d3f0390986e385a5b924c286769bcab1a/ModI18N-0.5.12.11-chs-auto-nightly.mod.zip'
-  I18N_SOURCE_SHA256: 'e43a5c79847b20854cd1181ed8b010ee96ea2609167e5f927c442ba8cbdd7124'
-  I18N_SOURCE_VERSION: '0.5.12.11-chs-auto-nightly'
-  I18N_TW_FILENAME: 'ModI18N-0.5.12.11-zhtw.mod.zip'
   BUILD_DIR: '/tmp/dolp-v0778-build'
   SITE_DIR: '/tmp/dolp-v0778-site'
   PAGES_DIR: '/tmp/dolp-v0778-pages'
@@ -277,286 +273,6 @@ jobs:
           print(json.dumps(report, indent=2))
           PY
 
-      - name: Build the pinned Traditional Chinese ModI18N for core 0.5.12.11
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          curl \
-            --fail \
-            --location \
-            --retry 5 \
-            --retry-all-errors \
-            --connect-timeout 30 \
-            --max-time 900 \
-            --user-agent 'Mozilla/5.0 DoLP zh-TW ModI18N builder' \
-            "$I18N_SOURCE_URL" \
-            --output "$BUILD_DIR/ModI18N-source.mod.zip"
-
-          printf '%s  %s\n' "$I18N_SOURCE_SHA256" "$BUILD_DIR/ModI18N-source.mod.zip" | sha256sum --check -
-          unzip -t "$BUILD_DIR/ModI18N-source.mod.zip" >/dev/null
-          python3 -m pip install --disable-pip-version-check --no-cache-dir 'opencc-python-reimplemented==0.1.7'
-          mkdir -p "$SITE_DIR/mods"
-
-          python3 - <<'PY'
-          from pathlib import Path
-          from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
-          import hashlib
-          import html as html_module
-          import json
-          import os
-          import re
-
-          from opencc import OpenCC
-
-          build = Path(os.environ["BUILD_DIR"])
-          site = Path(os.environ["SITE_DIR"])
-          source_path = build / "ModI18N-source.mod.zip"
-          output_path = site / "mods" / os.environ["I18N_TW_FILENAME"]
-          report_path = build / "translation-info.json"
-          converter = OpenCC("s2twp")
-          source_url = os.environ["I18N_SOURCE_URL"]
-          license_url = "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/blob/main/LICENSE"
-          target_version = "v0.5.12.11-zhtw-1.0.1"
-          text_suffixes = {".css", ".js", ".json", ".md", ".txt"}
-
-          def sha256_bytes(value):
-              return hashlib.sha256(value).hexdigest()
-
-          def copy_info(source, directory=False):
-              target = ZipInfo(source.filename, source.date_time)
-              target.comment = source.comment
-              target.extra = source.extra
-              target.create_system = source.create_system
-              target.external_attr = source.external_attr
-              target.internal_attr = source.internal_attr
-              target.flag_bits = source.flag_bits
-              target.compress_type = ZIP_STORED if directory else ZIP_DEFLATED
-              return target
-
-          required = {
-              "boot.json",
-              "i18n.json",
-              "dist/i18nLoad.js",
-              "dist/earlyload/earlyload.js",
-              "dist/preload/preload.js",
-          }
-
-          with ZipFile(source_path) as archive:
-              names = set(archive.namelist())
-              missing = sorted(required - names)
-              if missing:
-                  raise SystemExit(f"Source ModI18N archive is missing: {missing}")
-
-              source_i18n_text = archive.read("i18n.json").decode("utf-8")
-              source_data = json.loads(source_i18n_text)
-              translated_i18n_text = converter.convert(source_i18n_text)
-              translated_data = json.loads(translated_i18n_text)
-
-              source_entries = []
-              translated_entries = []
-              for group in source_data["typeB"].values():
-                  source_entries.extend(group)
-              for group in translated_data["typeB"].values():
-                  translated_entries.extend(group)
-              if len(source_entries) != len(translated_entries):
-                  raise SystemExit("Traditional conversion changed the translation entry count")
-
-              changed_targets = 0
-              translated_targets = 0
-              for before, after in zip(source_entries, translated_entries, strict=True):
-                  for immutable in ("f", "pN", "fileName", "pos", "js"):
-                      if before.get(immutable) != after.get(immutable):
-                          raise SystemExit(f"Traditional conversion changed immutable field {immutable}")
-                  if before.get("t") != after.get("t"):
-                      changed_targets += 1
-                  if any("\u3400" <= char <= "\u9fff" for char in after.get("t", "")):
-                      translated_targets += 1
-
-              if len(source_entries) != 198095:
-                  raise SystemExit(f"Unexpected translation entry count: {len(source_entries)}")
-              if translated_targets != 196999:
-                  raise SystemExit(f"Unexpected translated target count: {translated_targets}")
-              if changed_targets < 100000:
-                  raise SystemExit(f"Too few entries changed to Traditional Chinese: {changed_targets}")
-              if "開始遊戲！" not in translated_i18n_text:
-                  raise SystemExit("Traditional start-control translation is missing")
-              if "开始游戏！" in translated_i18n_text:
-                  raise SystemExit("Simplified start-control translation remains")
-
-              for token in ("<<", ">>", "[[", "]]", "<span", "</span", "$player"):
-                  if source_i18n_text.count(token) != translated_i18n_text.count(token):
-                      raise SystemExit(f"Traditional conversion changed structural token count: {token}")
-
-              # The community translation targets upstream DoL. DoLP changes the
-              # position of many otherwise identical strings and replaces a small
-              # number of them. ModI18N normally rolls back an entire passage when
-              # one positional match fails, so adapt every retained rule to the
-              # exact v0.778 content and omit only rules whose English source no
-              # longer exists. This keeps DoLP additions intact and prevents tens
-              # of thousands of expensive fuzzy-match failures on mobile Safari.
-              upstream = (build / "upstream.html").read_text(encoding="utf-8-sig")
-              passages = {}
-              for match in re.finditer(
-                  r'<tw-passagedata\b([^>]*)>(.*?)</tw-passagedata>',
-                  upstream,
-                  flags=re.DOTALL,
-              ):
-                  name_match = re.search(r'\bname="([^"]*)"', match.group(1))
-                  if name_match:
-                      passages[html_module.unescape(name_match.group(1))] = html_module.unescape(match.group(2))
-
-              def split_tweego_files(kind, closing_tag):
-                  marker = re.compile(r'/\* ' + kind + r' #\d+: "([^"]+)" \*/')
-                  matches = list(marker.finditer(upstream))
-                  files = {}
-                  for index, match in enumerate(matches):
-                      end = matches[index + 1].start() if index + 1 < len(matches) else upstream.find(closing_tag, match.end())
-                      if end < 0:
-                          raise SystemExit(f"Cannot find {closing_tag} after {match.group(1)}")
-                      files[match.group(1).rsplit("/", 1)[-1]] = upstream[match.end():end]
-                  return files
-
-              scripts = split_tweego_files("twine-user-script", "</script>")
-              styles = split_tweego_files("twine-user-stylesheet", "</style>")
-
-              def find_nearest(source, needle, hint):
-                  if not source or not needle:
-                      return None
-                  positions = []
-                  start = 0
-                  while True:
-                      found = source.find(needle, start)
-                      if found < 0:
-                          break
-                      positions.append(found)
-                      start = found + max(1, len(needle))
-                  return min(positions, key=lambda value: abs(value - hint)) if positions else None
-
-              retained = 0
-              omitted = 0
-              repositioned = 0
-              for group_name, entries in list(translated_data["typeB"].items()):
-                  compatible = []
-                  for entry in entries:
-                      if entry.get("pN"):
-                          container = passages.get(entry["pN"])
-                      elif entry.get("js"):
-                          container = scripts.get(entry.get("fileName"))
-                      elif entry.get("css"):
-                          container = styles.get(entry.get("fileName"))
-                      else:
-                          container = None
-                      actual = find_nearest(container, entry.get("f", ""), entry.get("pos", 0))
-                      if actual is None:
-                          omitted += 1
-                          continue
-                      if actual != entry.get("pos"):
-                          repositioned += 1
-                          entry["pos"] = actual
-                      compatible.append(entry)
-                  translated_data["typeB"][group_name] = compatible
-                  retained += len(compatible)
-
-              if retained < 190000 or omitted > 2000:
-                  raise SystemExit(f"Unexpected DoLP compatibility result: retained={retained}, omitted={omitted}")
-              translated_i18n_text = json.dumps(
-                  translated_data,
-                  ensure_ascii=False,
-                  separators=(",", ":"),
-              )
-              if "開始遊戲！" not in translated_i18n_text:
-                  raise SystemExit("DoLP-compatible rules lost the Traditional start control")
-
-              with ZipFile(output_path, "w", compression=ZIP_DEFLATED, compresslevel=9) as output:
-                  for info in archive.infolist():
-                      if info.is_dir():
-                          output.writestr(copy_info(info, directory=True), b"")
-                          continue
-
-                      raw = archive.read(info.filename)
-                      suffix = Path(info.filename).suffix.lower()
-                      if info.filename == "i18n.json":
-                          raw = translated_i18n_text.encode("utf-8")
-                      elif suffix in text_suffixes:
-                          text = converter.convert(raw.decode("utf-8"))
-                          if info.filename == "boot.json":
-                              boot = json.loads(text)
-                              if boot.get("name") != "ModI18N":
-                                  raise SystemExit("Unexpected ModI18N name")
-                              dependency = next(
-                                  (
-                                      item
-                                      for item in boot.get("dependenceInfo", [])
-                                      if item.get("modName") == "GameVersion"
-                                  ),
-                                  None,
-                              )
-                              if not dependency or dependency.get("version") != "=0.5.12.11":
-                                  raise SystemExit("Source ModI18N is not pinned to game core 0.5.12.11")
-                              boot["version"] = target_version
-                              additions = boot.setdefault("additionFile", [])
-                              if "ATTRIBUTION.zh-TW.md" not in additions:
-                                  additions.append("ATTRIBUTION.zh-TW.md")
-                              text = json.dumps(boot, ensure_ascii=False, indent=2) + "\n"
-                          raw = text.encode("utf-8")
-                      output.writestr(copy_info(info), raw)
-
-                  attribution = f"""# ModI18N 繁體中文（台灣）改作版
-
-          本模組以 Degrees of Lewdity 中文漢化社群的 `ModI18N-0.5.12.11-chs-auto-nightly` 為基礎，使用 OpenCC `s2twp` 規則轉換為繁體中文並調整模組版本資訊。
-
-          - 原始漢化專案：https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization
-          - 原始構建來源：{source_url}
-          - 修改內容：簡體中文字詞轉為繁體中文（台灣慣用詞），英文來源欄位、Twine 巨集、程式識別字與依賴版本保持不變。
-          - 授權：CC BY-NC-SA 4.0（署名－非商業性－相同方式分享）
-          - 授權全文：{license_url}
-          - 狀態：非漢化組官方發行版；不代表原漢化組背書。
-          """
-                  info = ZipInfo("ATTRIBUTION.zh-TW.md", (2026, 9, 15, 0, 0, 0))
-                  info.compress_type = ZIP_DEFLATED
-                  info.external_attr = 0o100644 << 16
-                  output.writestr(info, attribution.encode("utf-8"))
-
-          with ZipFile(output_path) as output:
-              if output.testzip() is not None:
-                  raise SystemExit("The Traditional Chinese Mod archive is corrupt")
-              boot = json.loads(output.read("boot.json").decode("utf-8"))
-              if boot.get("version") != target_version:
-                  raise SystemExit("Repacked Traditional Chinese Mod has the wrong version")
-
-          report = {
-              "language": "zh-TW",
-              "conversion": "OpenCC s2twp",
-              "source": source_url,
-              "sourceSha256": sha256_bytes(source_path.read_bytes()),
-              "sourceVersion": os.environ["I18N_SOURCE_VERSION"],
-              "targetVersion": target_version,
-              "targetFile": output_path.name,
-              "targetBytes": output_path.stat().st_size,
-              "targetSha256": sha256_bytes(output_path.read_bytes()),
-              "translationEntries": len(source_entries),
-              "compatibleEntries": retained,
-              "incompatibleEntriesOmitted": omitted,
-              "positionsAdaptedForDoLP": repositioned,
-              "translatedTargets": translated_targets,
-              "targetsChangedToTraditional": changed_targets,
-              "startControl": "開始遊戲！",
-              "license": "CC BY-NC-SA 4.0",
-              "licenseUrl": license_url,
-              "attributionIncluded": True,
-          }
-          report_path.write_text(
-              json.dumps(report, ensure_ascii=False, indent=2) + "\n",
-              encoding="utf-8",
-          )
-          (site / "modList.json").write_text(
-              json.dumps([f"mods/{output_path.name}"], ensure_ascii=False) + "\n",
-              encoding="utf-8",
-          )
-          print(json.dumps(report, ensure_ascii=False, indent=2))
-          PY
-
       - name: Add iPhone launch metadata and remove obsolete web-launcher files
         shell: bash
         run: |
@@ -591,7 +307,7 @@ jobs:
           <meta name="theme-color" content="#111111">
           <meta name="apple-mobile-web-app-capable" content="yes">
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-          <meta name="apple-mobile-web-app-title" content="DoLP v0.778 繁中">
+          <meta name="apple-mobile-web-app-title" content="DoLP v0.778">
           <link rel="manifest" href="manifest.json">
           <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
           <script>
@@ -623,8 +339,8 @@ jobs:
                   target.write_text(content, encoding="utf-8")
 
           manifest = {
-              "name": "DoLP v0.778 · Aoki Utage + Mysterious · 繁體中文 · ModLoader",
-              "short_name": "DoLP 0.778 繁中",
+              "name": "DoLP v0.778 · Aoki Utage + Mysterious · ModLoader",
+              "short_name": "DoLP v0.778",
               "start_url": "./",
               "scope": "./",
               "display": "standalone",
@@ -675,10 +391,7 @@ jobs:
           write_icon(site / "icon-192.png", 192)
           write_icon(site / "apple-touch-icon.png", 180)
           (site / ".nojekyll").touch()
-          (site / "version.txt").write_text(
-              "DoLP v0.778 · Aoki Utage + Mysterious · 繁體中文 · ML v2.101.1\n",
-              encoding="utf-8",
-          )
+          (site / "version.txt").write_text("DoLP v0.778 · Aoki Utage + Mysterious · ML v2.101.1\n", encoding="utf-8")
 
           image_paths = [path for path in (site / "img").rglob("*") if path.is_file()]
           upstream_bytes = upstream.read_bytes()
@@ -706,8 +419,6 @@ jobs:
               "loaderSourceHtml": (build / "loader-html-name.txt").read_text(encoding="utf-8").strip(),
               "loaderCompanionSha256": hashlib.sha256((build / "loader-companion.html").read_bytes()).hexdigest(),
               "loaderInstall": json.loads((build / "loader-info.json").read_text(encoding="utf-8")),
-              "language": "zh-TW",
-              "translation": json.loads((build / "translation-info.json").read_text(encoding="utf-8")),
               "deployment": "direct index.html with ModLoader; no Service Worker or compressed web launcher",
               "sourceCommit": os.environ["GITHUB_SHA"],
               "publishedAt": datetime.now(timezone.utc).isoformat(),
@@ -724,7 +435,6 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          from zipfile import ZipFile
           import hashlib
           import json
           import os
@@ -867,7 +577,6 @@ jobs:
               "index.html",
               "manifest.json",
               "modList.json",
-              "mods",
               "style.css",
               "usettings.js",
               "version.txt",
@@ -888,9 +597,6 @@ jobs:
 
           build_info = json.loads((site / "build-info.json").read_text(encoding="utf-8"))
           manifest = json.loads((site / "manifest.json").read_text(encoding="utf-8"))
-          translation_info = build_info.get("translation", {})
-          translation_mod = site / "mods" / os.environ["I18N_TW_FILENAME"]
-          expected_mod_list = [f"mods/{os.environ['I18N_TW_FILENAME']}"]
           expected_info = {
               "version": "DoLP v0.778",
               "edition": "Aoki Utage + Mysterious",
@@ -898,57 +604,18 @@ jobs:
               "packageSha256": os.environ["PACKAGE_SHA256"],
               "modLoader": "ML v2.101.1",
               "loaderArchiveSha256": os.environ["LOADER_SHA256"],
-              "language": "zh-TW",
           }
           for key, expected in expected_info.items():
               if build_info.get(key) != expected:
                   raise SystemExit(f"build-info.json {key} mismatch: {build_info.get(key)!r} != {expected!r}")
-          if manifest.get("name") != "DoLP v0.778 · Aoki Utage + Mysterious · 繁體中文 · ModLoader":
+          if manifest.get("name") != "DoLP v0.778 · Aoki Utage + Mysterious · ModLoader":
               raise SystemExit("Manifest name is not the v0.778 edition")
-          if manifest.get("short_name") != "DoLP 0.778 繁中":
+          if manifest.get("short_name") != "DoLP v0.778":
               raise SystemExit("Manifest short name is not v0.778")
-          if (site / "version.txt").read_text(encoding="utf-8") != "DoLP v0.778 · Aoki Utage + Mysterious · 繁體中文 · ML v2.101.1\n":
+          if (site / "version.txt").read_text(encoding="utf-8") != "DoLP v0.778 · Aoki Utage + Mysterious · ML v2.101.1\n":
               raise SystemExit("version.txt is not the exact v0.778 edition marker")
-          if json.loads((site / "modList.json").read_text(encoding="utf-8")) != expected_mod_list:
-              raise SystemExit("modList.json does not preload exactly the pinned zh-TW ModI18N")
-          if sorted(path.name for path in (site / "mods").iterdir()) != [os.environ["I18N_TW_FILENAME"]]:
-              raise SystemExit("The published mods directory does not contain exactly the zh-TW ModI18N")
-          if not translation_mod.is_file():
-              raise SystemExit("The published zh-TW ModI18N is missing")
-          if translation_info.get("sourceSha256") != os.environ["I18N_SOURCE_SHA256"]:
-              raise SystemExit("The zh-TW ModI18N source hash is not pinned")
-          if translation_info.get("sourceVersion") != os.environ["I18N_SOURCE_VERSION"]:
-              raise SystemExit("The zh-TW ModI18N source version is wrong")
-          if translation_info.get("targetFile") != os.environ["I18N_TW_FILENAME"]:
-              raise SystemExit("The zh-TW ModI18N target filename is wrong")
-          if translation_info.get("targetSha256") != sha256_file(translation_mod):
-              raise SystemExit("The published zh-TW ModI18N hash is wrong")
-          if translation_info.get("translationEntries") != 198095:
-              raise SystemExit("The zh-TW ModI18N translation entry count is wrong")
-          if translation_info.get("compatibleEntries") != 197090:
-              raise SystemExit("The zh-TW ModI18N DoLP-compatible entry count is wrong")
-          if translation_info.get("incompatibleEntriesOmitted") != 1005:
-              raise SystemExit("The zh-TW ModI18N incompatible entry count is wrong")
-          if translation_info.get("positionsAdaptedForDoLP") != 78973:
-              raise SystemExit("The zh-TW ModI18N adapted-position count is wrong")
-          if translation_info.get("translatedTargets") != 196999:
-              raise SystemExit("The zh-TW ModI18N translated target count is wrong")
-          if translation_info.get("targetsChangedToTraditional", 0) < 100000:
-              raise SystemExit("The zh-TW ModI18N did not convert enough translation targets")
-          if translation_info.get("license") != "CC BY-NC-SA 4.0" or not translation_info.get("attributionIncluded"):
-              raise SystemExit("The zh-TW ModI18N attribution or license metadata is missing")
-          with ZipFile(translation_mod) as archive:
-              if archive.testzip() is not None:
-                  raise SystemExit("The published zh-TW ModI18N archive is corrupt")
-              names = set(archive.namelist())
-              if not {"boot.json", "i18n.json", "ATTRIBUTION.zh-TW.md"}.issubset(names):
-                  raise SystemExit("The published zh-TW ModI18N has an incomplete archive tree")
-              boot = json.loads(archive.read("boot.json").decode("utf-8"))
-              if boot.get("name") != "ModI18N" or boot.get("version") != "v0.5.12.11-zhtw-1.0.1":
-                  raise SystemExit("The published zh-TW ModI18N boot metadata is wrong")
-              translated_i18n = archive.read("i18n.json").decode("utf-8")
-              if "開始遊戲！" not in translated_i18n or "开始游戏！" in translated_i18n:
-                  raise SystemExit("The published ModI18N did not retain the Traditional start control")
+          if json.loads((site / "modList.json").read_text(encoding="utf-8")) != []:
+              raise SystemExit("modList.json is not the safe empty remote-Mod list")
 
           story_bytes = upstream_story.encode("utf-8")
           report = {
@@ -984,7 +651,6 @@ jobs:
                   "eachBlockOccursOnce": True,
                   "sugarCubeEngines": 1,
               },
-              "translation": translation_info,
               "images": {
                   "files": len(published_images),
                   "bytes": published_image_bytes,
@@ -1083,19 +749,6 @@ jobs:
             } catch (error) {
               labelWaitError = String(error);
             }
-            let translationWaitError = null;
-            try {
-              await page.waitForFunction(
-                () =>
-                  typeof window.modI18N !== "undefined" &&
-                  window.modSC2DataManager?.getLanguageManager?.().mainLanguage === "zh" &&
-                  document.body.innerText.includes("開始遊戲！"),
-                null,
-                { timeout: 300000, polling: 500 }
-              );
-            } catch (error) {
-              translationWaitError = String(error);
-            }
 
             const state = await page.evaluate(() => {
               const text = document.body.innerText;
@@ -1113,44 +766,26 @@ jobs:
                 hasPrngError: text.includes("reading 'prng'"),
                 hasManager: typeof window.modSC2DataManager !== "undefined",
                 hasPreloader: typeof window.jsPreloader !== "undefined",
-                hasI18N: typeof window.modI18N !== "undefined",
-                hasTranslationMod: Boolean(
-                  window.modSC2DataManager?.getModLoader?.().getModByNameOne("ModI18N")
-                ),
-                translationLanguage:
-                  window.modSC2DataManager?.getLanguageManager?.().mainLanguage ?? null,
-                hasTraditionalStartControl: text.includes("開始遊戲！"),
-                hanCharacterCount: (text.match(/[\u3400-\u9fff]/g) || []).length,
                 embeddedModZipCount: Array.isArray(window.modDataValueZipList)
                   ? window.modDataValueZipList.length
                   : -1,
                 hasStoryInterface: Boolean(
                   document.querySelector("#story, #passages, #ui-bar")
                 ),
-                hasStartControl: text.includes("開始遊戲！"),
+                hasStartControl: text.includes("Start Game!"),
               };
             });
 
             const fatalConsoleErrors = consoleErrors.filter(message =>
-              /prng|Cannot redefine property|initI10n is not a function|漢化與遊戲版本不匹配|汉化与游戏版本不匹配/i.test(message)
+              /prng|Cannot redefine property|initI10n is not a function/i.test(message)
             );
-            console.log(JSON.stringify({ state, labelWaitError, translationWaitError, pageErrors, consoleErrors, fatalConsoleErrors }, null, 2));
+            console.log(JSON.stringify({ state, labelWaitError, pageErrors, consoleErrors, fatalConsoleErrors }, null, 2));
             if (!state.hasV0778) throw new Error("v0.778 core label did not render");
             if (!state.hasModLoaderLabel) throw new Error("ML-v2.101.1 label did not render");
             if (!state.hasExactVersionLine) throw new Error("The combined DoLP/ModLoader version line did not render");
             if (state.hasPrngError) throw new Error("The game rendered a State.prng startup error");
             if (!state.hasManager) throw new Error("modSC2DataManager is unavailable");
             if (!state.hasPreloader) throw new Error("jsPreloader is unavailable");
-            if (translationWaitError) throw new Error("The Traditional Chinese UI did not render: " + translationWaitError);
-            if (!state.hasI18N || !state.hasTranslationMod) {
-              throw new Error("The Traditional Chinese ModI18N did not load");
-            }
-            if (state.translationLanguage !== "zh") {
-              throw new Error("The ModLoader language manager is not using Chinese");
-            }
-            if (!state.hasTraditionalStartControl || state.hanCharacterCount < 10) {
-              throw new Error("The rendered page is not visibly Traditional Chinese");
-            }
             if (state.embeddedModZipCount < 1) throw new Error("Embedded Mod ZIP list is empty");
             if (!state.hasStoryInterface || !state.hasStartControl) {
               throw new Error("The playable start interface did not render");
@@ -1179,7 +814,6 @@ jobs:
           test -s "$SITE_DIR/content-audit.json"
           test -s "$SITE_DIR/manifest.json"
           test -s "$SITE_DIR/apple-touch-icon.png"
-          test -s "$SITE_DIR/mods/$I18N_TW_FILENAME"
           test ! -e "$SITE_DIR/sw.js"
           test ! -e "$SITE_DIR/payload"
           grep -aFq 'DoLP v0.778' "$SITE_DIR/index.html"
@@ -1191,10 +825,6 @@ jobs:
           python3 -m json.tool "$SITE_DIR/content-audit.json" >/dev/null
           test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["result"])' "$SITE_DIR/content-audit.json")" = "pass"
           python3 -m json.tool "$SITE_DIR/manifest.json" >/dev/null
-          test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["language"])' "$SITE_DIR/build-info.json")" = "zh-TW"
-          test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["translation"]["targetSha256"])' "$SITE_DIR/build-info.json")" = "$(sha256sum "$SITE_DIR/mods/$I18N_TW_FILENAME" | cut -d' ' -f1)"
-          test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[0])' "$SITE_DIR/modList.json")" = "mods/$I18N_TW_FILENAME"
-          unzip -t "$SITE_DIR/mods/$I18N_TW_FILENAME" >/dev/null
 
           HTML_BYTES="$(stat -c '%s' "$SITE_DIR/index.html")"
           IMAGE_FILES="$(find "$SITE_DIR/img" -type f | wc -l)"
@@ -1217,5 +847,5 @@ jobs:
           cp -a "$SITE_DIR"/. "$PAGES_DIR"/
 
           git -C "$PAGES_DIR" add -A
-          git -C "$PAGES_DIR" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Publish DoLP v0.778 zh-TW with ModLoader v2.101.1'
+          git -C "$PAGES_DIR" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Publish DoLP v0.778 with ModLoader v2.101.1'
           git -C "$PAGES_DIR" push origin HEAD:gh-pages
