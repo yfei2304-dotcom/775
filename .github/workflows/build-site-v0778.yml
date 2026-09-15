@@ -18,6 +18,7 @@ concurrency:
 env:
   DOLP_VERSION: '0.778'
   PACKAGE_URL: 'https://dolp.download/DoLP_aoki_utage_mys/v0.778/DoLP_aoki_utage_mys_v0.778.zip'
+  LOADER_URL: 'https://raw.githubusercontent.com/yfei2304-dotcom/dolp-aoki-mys-modloader/4821046562cad9c3df692bbe7098df441e2fb8a7/payload/game-v0772.bundle'
   BUILD_DIR: '/tmp/dolp-v0778-build'
   SITE_DIR: '/tmp/dolp-v0778-site'
   PAGES_DIR: '/tmp/dolp-v0778-pages'
@@ -81,7 +82,134 @@ jobs:
           echo "Image files: $IMAGE_FILES"
           echo "Image bytes: $IMAGE_BYTES"
 
-      - name: Add iPhone launch metadata and remove the obsolete v0.775 loader
+      - name: Install the pinned ModLoader v2.101.1 runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --retry-all-errors \
+            --connect-timeout 30 \
+            --max-time 600 \
+            --user-agent 'Mozilla/5.0 DoLP ModLoader installer' \
+            "$LOADER_URL" \
+            --output "$BUILD_DIR/loader-companion.bundle"
+
+          gzip -t "$BUILD_DIR/loader-companion.bundle"
+          gzip -dc "$BUILD_DIR/loader-companion.bundle" > "$BUILD_DIR/loader-companion.html"
+          grep -aFq 'window.modDataValueZipList' "$BUILD_DIR/loader-companion.html"
+          grep -aFq 'modSC2DataManager' "$BUILD_DIR/loader-companion.html"
+          grep -aFq 'ML v2.101.1' "$BUILD_DIR/loader-companion.html"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import os
+          import re
+
+          build = Path(os.environ["BUILD_DIR"])
+          site = Path(os.environ["SITE_DIR"])
+          official = (build / "upstream.html").read_text(encoding="utf-8-sig")
+          companion = (build / "loader-companion.html").read_text(encoding="utf-8-sig")
+
+          script_pattern = re.compile(r"<script\b[^>]*>[\s\S]*?</script>", re.IGNORECASE)
+          loader_blocks = []
+          seen_hashes = set()
+          for match in script_pattern.finditer(companion):
+              block = match.group(0)
+              if "window.modDataValueZipList" in block or "modSC2DataManager" in block:
+                  digest = hashlib.sha256(block.encode("utf-8")).hexdigest()
+                  if digest not in seen_hashes:
+                      seen_hashes.add(digest)
+                      loader_blocks.append(block)
+
+          if len(loader_blocks) < 3:
+              raise SystemExit(f"Expected at least 3 ModLoader blocks, found {len(loader_blocks)}")
+          if "window.modDataValueZipList" in official or "modSC2DataManager" in official:
+              raise SystemExit("The v0.778 upstream HTML unexpectedly already contains ModLoader")
+
+          sugarcube_candidates = []
+          for match in script_pattern.finditer(official):
+              block = match.group(0)
+              if (
+                  re.search(r'id=["\']script-sugarcube["\']', block, re.IGNORECASE)
+                  and "window.SugarCube" in block
+              ):
+                  sugarcube_candidates.append(match)
+
+          if not sugarcube_candidates:
+              raise SystemExit("Could not locate the v0.778 SugarCube runtime")
+          target = sugarcube_candidates[-1]
+          sugarcube = target.group(0)
+
+          start_marker = "window.SugarCube={},jQuery((()=>{"
+          end_marker = "}))})(window,window.document,jQuery);"
+          if sugarcube.count(start_marker) != 1:
+              raise SystemExit(f"Unexpected SugarCube start marker count: {sugarcube.count(start_marker)}")
+          end_at = sugarcube.rfind(end_marker)
+          if end_at < 0:
+              raise SystemExit("SugarCube end marker not found")
+
+          sugarcube = sugarcube.replace(
+              start_marker,
+              "window.SugarCube={},window.mainStart=((()=>{",
+              1,
+          )
+          end_at = sugarcube.rfind(end_marker)
+          replacement = """}))
+          if (typeof window.modSC2DataManager !== 'undefined') { window.modSC2DataManager.startInit().then(() => window.jsPreloader.startLoad()).then(() => {window.mainStart();if(typeof window.initI10n==='function')window.initI10n(l10nStrings);}).catch(err=>console.error(err)); } else { window.mainStart();if(typeof window.initI10n==='function')window.initI10n(l10nStrings); }
+          })(window,window.document,jQuery);"""
+          sugarcube = sugarcube[:end_at] + replacement + sugarcube[end_at + len(end_marker):]
+
+          merged = (
+              official[:target.start()]
+              + "\n".join(loader_blocks)
+              + "\n"
+              + sugarcube
+              + official[target.end():]
+          )
+          csp = "content=\"default-src 'self' 'unsafe-eval' 'unsafe-inline'\""
+          if csp in merged:
+              merged = merged.replace(
+                  csp,
+                  "content=\"default-src 'self' 'unsafe-eval' 'unsafe-inline' *\"",
+                  1,
+              )
+
+          required = (
+              "DoLP v0.778",
+              "ML v2.101.1",
+              "window.modDataValueZipList",
+              "modSC2DataManager",
+              "window.mainStart",
+          )
+          for marker in required:
+              if marker not in merged:
+                  raise SystemExit(f"Merged HTML is missing {marker}")
+
+          (site / "index.html").write_text(merged, encoding="utf-8")
+          report = {
+              "modLoader": "ML v2.101.1",
+              "loaderBlocks": len(loader_blocks),
+              "loaderCompanionBytes": (build / "loader-companion.html").stat().st_size,
+              "loaderCompanionSha256": hashlib.sha256(
+                  (build / "loader-companion.html").read_bytes()
+              ).hexdigest(),
+              "mergedHtmlBytes": len(merged.encode("utf-8")),
+              "mergedHtmlSha256": hashlib.sha256(merged.encode("utf-8")).hexdigest(),
+          }
+          (build / "loader-info.json").write_text(
+              json.dumps(report, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, indent=2))
+          PY
+
+      - name: Add iPhone launch metadata and remove the obsolete v0.775 web launcher
         shell: bash
         run: |
           set -euo pipefail
@@ -154,7 +282,7 @@ jobs:
                   target.write_text(content, encoding="utf-8")
 
           manifest = {
-              "name": "DoLP v0.778 · Aoki Utage + Mysterious",
+              "name": "DoLP v0.778 · Aoki Utage + Mysterious · ModLoader",
               "short_name": "DoLP v0.778",
               "start_url": "./",
               "scope": "./",
@@ -206,7 +334,7 @@ jobs:
           write_icon(site / "icon-192.png", 192)
           write_icon(site / "apple-touch-icon.png", 180)
           (site / ".nojekyll").touch()
-          (site / "version.txt").write_text("DoLP v0.778 · Aoki Utage + Mysterious\n", encoding="utf-8")
+          (site / "version.txt").write_text("DoLP v0.778 · Aoki Utage + Mysterious · ML v2.101.1\n", encoding="utf-8")
 
           image_paths = [path for path in (site / "img").rglob("*") if path.is_file()]
           upstream_bytes = upstream.read_bytes()
@@ -226,7 +354,11 @@ jobs:
               "publishedHtmlSha256": hashlib.sha256(published_bytes).hexdigest(),
               "imageFiles": len(image_paths),
               "imageBytes": sum(path.stat().st_size for path in image_paths),
-              "deployment": "direct index.html; no Service Worker or compressed loader",
+              "modLoader": "ML v2.101.1",
+              "loaderSource": os.environ["LOADER_URL"],
+              "loaderCompanionSha256": hashlib.sha256((build / "loader-companion.html").read_bytes()).hexdigest(),
+              "loaderInstall": json.loads((build / "loader-info.json").read_text(encoding="utf-8")),
+              "deployment": "direct index.html with ModLoader; no Service Worker or compressed web launcher",
               "sourceCommit": os.environ["GITHUB_SHA"],
               "publishedAt": datetime.now(timezone.utc).isoformat(),
           }
@@ -248,6 +380,10 @@ jobs:
           test ! -e "$SITE_DIR/sw.js"
           test ! -e "$SITE_DIR/payload"
           grep -aFq 'DoLP v0.778' "$SITE_DIR/index.html"
+          grep -aFq 'ML v2.101.1' "$SITE_DIR/index.html"
+          grep -aFq 'window.modDataValueZipList' "$SITE_DIR/index.html"
+          grep -aFq 'modSC2DataManager' "$SITE_DIR/index.html"
+          grep -aFq 'window.mainStart' "$SITE_DIR/index.html"
           grep -aFq 'data-dolp-pwa-v0778' "$SITE_DIR/index.html"
           python3 -m json.tool "$SITE_DIR/build-info.json" >/dev/null
           python3 -m json.tool "$SITE_DIR/manifest.json" >/dev/null
@@ -273,5 +409,5 @@ jobs:
           cp -a "$SITE_DIR"/. "$PAGES_DIR"/
 
           git -C "$PAGES_DIR" add -A
-          git -C "$PAGES_DIR" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Publish DoLP v0.778 Aoki Utage + Mysterious'
+          git -C "$PAGES_DIR" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Publish DoLP v0.778 with ModLoader v2.101.1'
           git -C "$PAGES_DIR" push origin HEAD:gh-pages
