@@ -4,9 +4,9 @@ This repository publishes a directly playable iPhone/Safari build of **DoLP v0.7
 
 ## Play
 
-https://yfei2304-dotcom.github.io/775/
+https://yfei2304-dotcom.github.io/778/
 
-The repository name and public URL remain `775`, but all published game files are v0.778.
+The repository and public URL use `778`, matching the published game version.
 
 ## Sources
 
@@ -20,8 +20,12 @@ Pinned ModLoader companion:
 
 The workflow verifies the official archive SHA-256 (`5f02311487aa0acbaa834f1c8a284328861c9e464a4d39a8ea56efe2cefddfdc`), extracts the ModLoader runtime built specifically for DoL core `0.5.12.11`, and installs those blocks into the genuine DoLP v0.778 SugarCube startup sequence. It does not replace the v0.778 game core or its Aoki Utage + Mysterious assets.
 
-The game is published directly as `index.html`. It does not depend on the obsolete v0.775 Service Worker, compressed web payload, or redirect launcher that caused the blank page on iOS.
+The game is published directly as `index.html`. It does not depend on the obsolete Service Worker, compressed web payload, or redirect launcher that caused the blank page on iOS.
 
-Generated provenance, hashes, and ModLoader installation details are available at:
+Generated provenance and ModLoader installation details:
 
-https://yfei2304-dotcom.github.io/775/build-info.json
+https://yfei2304-dotcom.github.io/778/build-info.json
+
+The full content audit verifies that the Twine story data and all 31,349 images are byte-identical to the pinned official v0.778 package, and that the two ModLoader blocks match the official core 0.5.12.11 build:
+
+https://yfei2304-dotcom.github.io/778/content-audit.json

@@ -18,6 +18,12 @@ concurrency:
 env:
   DOLP_VERSION: '0.778'
   PACKAGE_URL: 'https://dolp.download/DoLP_aoki_utage_mys/v0.778/DoLP_aoki_utage_mys_v0.778.zip'
+  PACKAGE_BYTES: '125324567'
+  PACKAGE_SHA256: '67e21e9615d94783df26c3e1dfebf51840cb68278e419606ea69052564a0da51'
+  UPSTREAM_HTML_BYTES: '57188965'
+  UPSTREAM_HTML_SHA256: '6144728ebb7d47ddc2ee861281ddfadd161d1bf67babf6cc59510de1a28ca6ef'
+  EXPECTED_IMAGE_FILES: '31349'
+  EXPECTED_IMAGE_BYTES: '143622449'
   LOADER_URL: 'https://github.com/Lyoko-Jeremie/DoLModLoaderBuild/releases/download/v2.101.1-dol-0.5.12.11-240b837588c6f6ee6b07df0b161aa28f844834b0/DoL-ModLoader-2.101.1-dol-0.5.12.11-240b837588c6f6ee6b07df0b161aa28f844834b0.zip'
   LOADER_SHA256: '5f02311487aa0acbaa834f1c8a284328861c9e464a4d39a8ea56efe2cefddfdc'
   BUILD_DIR: '/tmp/dolp-v0778-build'
@@ -55,6 +61,8 @@ jobs:
             "$PACKAGE_URL" \
             --output "$BUILD_DIR/package.zip"
 
+          test "$(stat -c '%s' "$BUILD_DIR/package.zip")" = "$PACKAGE_BYTES"
+          printf '%s  %s\n' "$PACKAGE_SHA256" "$BUILD_DIR/package.zip" | sha256sum --check -
           unzip -t "$BUILD_DIR/package.zip" >/dev/null
           unzip -q "$BUILD_DIR/package.zip" -d "$BUILD_DIR/unpacked"
 
@@ -70,14 +78,14 @@ jobs:
           find "$SITE_DIR" -maxdepth 1 -type f -iname 'Degrees of Lewdity*.html' -delete
           cp "$BUILD_DIR/upstream.html" "$SITE_DIR/index.html"
 
-          grep -aFq 'DoLP v0.778' "$BUILD_DIR/upstream.html"
-          test "$(stat -c '%s' "$BUILD_DIR/upstream.html")" -gt 20000000
-          test "$(stat -c '%s' "$BUILD_DIR/upstream.html")" -lt 99000000
+          grep -aFq '0.5.12.11 DoLP v0.778' "$BUILD_DIR/upstream.html"
+          test "$(stat -c '%s' "$BUILD_DIR/upstream.html")" = "$UPSTREAM_HTML_BYTES"
+          printf '%s  %s\n' "$UPSTREAM_HTML_SHA256" "$BUILD_DIR/upstream.html" | sha256sum --check -
 
           IMAGE_FILES="$(find "$SITE_DIR/img" -type f | wc -l)"
           IMAGE_BYTES="$(find "$SITE_DIR/img" -type f -printf '%s\n' | awk '{sum += $1} END {print sum + 0}')"
-          test "$IMAGE_FILES" -gt 30000
-          test "$IMAGE_BYTES" -gt 100000000
+          test "$IMAGE_FILES" = "$EXPECTED_IMAGE_FILES"
+          test "$IMAGE_BYTES" = "$EXPECTED_IMAGE_BYTES"
           echo "Source HTML: $(cat "$BUILD_DIR/source-html-name.txt")"
           echo "HTML bytes: $(stat -c '%s' "$BUILD_DIR/upstream.html")"
           echo "Image files: $IMAGE_FILES"
@@ -265,7 +273,7 @@ jobs:
           print(json.dumps(report, indent=2))
           PY
 
-      - name: Add iPhone launch metadata and remove the obsolete v0.775 web launcher
+      - name: Add iPhone launch metadata and remove obsolete web-launcher files
         shell: bash
         run: |
           set -euo pipefail
@@ -311,13 +319,6 @@ jobs:
                   registrations
                     .filter(registration => new URL(registration.scope).pathname === here)
                     .map(registration => registration.unregister())
-                ))
-                .catch(() => {});
-            }
-            if ("caches" in window) {
-              caches.keys()
-                .then(keys => Promise.all(
-                  keys.filter(key => key.includes("v0775")).map(key => caches.delete(key))
                 ))
                 .catch(() => {});
             }
@@ -426,6 +427,250 @@ jobs:
               json.dumps(info, ensure_ascii=False, indent=2) + "\n",
               encoding="utf-8",
           )
+          PY
+
+      - name: Audit every published component against the pinned v0.778 sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import os
+          import re
+
+          build = Path(os.environ["BUILD_DIR"])
+          site = Path(os.environ["SITE_DIR"])
+          upstream_path = build / "upstream.html"
+          published_path = site / "index.html"
+          companion_path = build / "loader-companion.html"
+
+          def sha256_file(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          def image_manifest(root):
+              records = []
+              total_bytes = 0
+              manifest_hash = hashlib.sha256()
+              for path in sorted((p for p in root.rglob("*") if p.is_file()), key=lambda p: p.relative_to(root).as_posix()):
+                  relative = path.relative_to(root).as_posix()
+                  size = path.stat().st_size
+                  digest = sha256_file(path)
+                  records.append((relative, size, digest))
+                  total_bytes += size
+                  manifest_hash.update(relative.encode("utf-8"))
+                  manifest_hash.update(b"\0")
+                  manifest_hash.update(str(size).encode("ascii"))
+                  manifest_hash.update(b"\0")
+                  manifest_hash.update(digest.encode("ascii"))
+                  manifest_hash.update(b"\n")
+              return records, total_bytes, manifest_hash.hexdigest()
+
+          package_path = build / "package.zip"
+          if package_path.stat().st_size != int(os.environ["PACKAGE_BYTES"]):
+              raise SystemExit("Pinned v0.778 package byte count changed")
+          if sha256_file(package_path) != os.environ["PACKAGE_SHA256"]:
+              raise SystemExit("Pinned v0.778 package SHA-256 mismatch")
+          if upstream_path.stat().st_size != int(os.environ["UPSTREAM_HTML_BYTES"]):
+              raise SystemExit("Pinned v0.778 HTML byte count changed")
+          if sha256_file(upstream_path) != os.environ["UPSTREAM_HTML_SHA256"]:
+              raise SystemExit("Pinned v0.778 HTML SHA-256 mismatch")
+
+          upstream = upstream_path.read_text(encoding="utf-8-sig")
+          published = published_path.read_text(encoding="utf-8")
+          companion = companion_path.read_text(encoding="utf-8-sig")
+
+          story_pattern = re.compile(r"<tw-storydata\b[\s\S]*?</tw-storydata>", re.IGNORECASE)
+          upstream_story_match = story_pattern.search(upstream)
+          published_story_match = story_pattern.search(published)
+          if not upstream_story_match or not published_story_match:
+              raise SystemExit("Could not isolate the Twine story data")
+          upstream_story = upstream_story_match.group(0)
+          published_story = published_story_match.group(0)
+          if published_story != upstream_story:
+              raise SystemExit("Published Twine story data is not byte-identical to official DoLP v0.778")
+
+          script_pattern = re.compile(r"<script\b[^>]*>[\s\S]*?</script>", re.IGNORECASE)
+          companion_scripts = [match.group(0) for match in script_pattern.finditer(companion)]
+          if len(companion_scripts) < 2:
+              raise SystemExit("Official ModLoader build is missing its two leading runtime blocks")
+          official_loader_blocks = companion_scripts[:2]
+          if "window.modDataValueZipList" not in official_loader_blocks[0]:
+              raise SystemExit("Official ModLoader data block is invalid")
+          if "modSC2DataManager" not in official_loader_blocks[1] or "jsPreloader" not in official_loader_blocks[1]:
+              raise SystemExit("Official ModLoader BeforeSC2 block is invalid")
+          for number, block in enumerate(official_loader_blocks, start=1):
+              occurrences = published.count(block)
+              if occurrences != 1:
+                  raise SystemExit(f"Official ModLoader block {number} occurrence count is {occurrences}, expected 1")
+
+          sugarcube_scripts = re.findall(
+              r"<script\b(?=[^>]*\bid=[\"']script-sugarcube[\"'])[^>]*>",
+              published,
+              flags=re.IGNORECASE,
+          )
+          if len(sugarcube_scripts) != 1:
+              raise SystemExit(f"Published SugarCube engine count is {len(sugarcube_scripts)}, expected 1")
+
+          exact_version_line = "0.5.12.11 DoLP v0.778 -(ML-v2.101.1)"
+          if "0.5.12.11 DoLP v0.778" not in published:
+              raise SystemExit("The active DoLP v0.778 core marker is missing")
+          if "ML-v2.101.1" not in published:
+              raise SystemExit("The ModLoader v2.101.1 marker is missing")
+
+          shell_without_story = (
+              published[:published_story_match.start()]
+              + published[published_story_match.end():]
+          )
+          forbidden_shell_markers = (
+              "DoLP v0.768",
+              "DoLP v0.772",
+              "DoLP v0.775",
+              "game-v0768",
+              "game-v0772",
+              "game-v0775",
+              "v0768",
+              "v0772",
+              "v0775",
+          )
+          legacy_shell_hits = {
+              marker: shell_without_story.count(marker)
+              for marker in forbidden_shell_markers
+          }
+          if any(legacy_shell_hits.values()):
+              raise SystemExit(f"Legacy active-site markers found outside official story history: {legacy_shell_hits}")
+
+          source_html = next(
+              path for path in (build / "unpacked").rglob("*")
+              if path.is_file() and path.name.lower().startswith("degrees of lewdity") and path.suffix.lower() == ".html"
+          )
+          source_images, source_image_bytes, source_image_manifest_sha = image_manifest(source_html.parent / "img")
+          published_images, published_image_bytes, published_image_manifest_sha = image_manifest(site / "img")
+          if source_images != published_images:
+              source_map = {path: (size, digest) for path, size, digest in source_images}
+              published_map = {path: (size, digest) for path, size, digest in published_images}
+              missing = sorted(set(source_map) - set(published_map))
+              extra = sorted(set(published_map) - set(source_map))
+              changed = sorted(
+                  path for path in set(source_map) & set(published_map)
+                  if source_map[path] != published_map[path]
+              )
+              raise SystemExit(
+                  "Published image tree differs from official v0.778: "
+                  f"missing={missing[:10]}, extra={extra[:10]}, changed={changed[:10]}"
+              )
+          if len(published_images) != int(os.environ["EXPECTED_IMAGE_FILES"]):
+              raise SystemExit("Published v0.778 image count mismatch")
+          if published_image_bytes != int(os.environ["EXPECTED_IMAGE_BYTES"]):
+              raise SystemExit("Published v0.778 image byte count mismatch")
+
+          root_entries = sorted(path.name for path in site.iterdir())
+          expected_root_entries = sorted((
+              ".nojekyll",
+              "apple-touch-icon.png",
+              "build-info.json",
+              "icon-192.png",
+              "img",
+              "index.html",
+              "manifest.json",
+              "modList.json",
+              "style.css",
+              "usettings.js",
+              "version.txt",
+          ))
+          if root_entries != expected_root_entries:
+              raise SystemExit(
+                  f"Unexpected published root entries: actual={root_entries}, expected={expected_root_entries}"
+              )
+
+          legacy_path_pattern = re.compile(r"(?:^|[/_.-])(?:v?0?7(?:68|72|75)|768|772|775)(?:$|[/_.-])", re.IGNORECASE)
+          legacy_paths = [
+              path.relative_to(site).as_posix()
+              for path in site.rglob("*")
+              if legacy_path_pattern.search(path.relative_to(site).as_posix())
+          ]
+          if legacy_paths:
+              raise SystemExit(f"Legacy-version paths remain in the site: {legacy_paths[:20]}")
+
+          build_info = json.loads((site / "build-info.json").read_text(encoding="utf-8"))
+          manifest = json.loads((site / "manifest.json").read_text(encoding="utf-8"))
+          expected_info = {
+              "version": "DoLP v0.778",
+              "edition": "Aoki Utage + Mysterious",
+              "core": "0.5.12.11 DoLP v0.778",
+              "packageSha256": os.environ["PACKAGE_SHA256"],
+              "modLoader": "ML v2.101.1",
+              "loaderArchiveSha256": os.environ["LOADER_SHA256"],
+          }
+          for key, expected in expected_info.items():
+              if build_info.get(key) != expected:
+                  raise SystemExit(f"build-info.json {key} mismatch: {build_info.get(key)!r} != {expected!r}")
+          if manifest.get("name") != "DoLP v0.778 · Aoki Utage + Mysterious · ModLoader":
+              raise SystemExit("Manifest name is not the v0.778 edition")
+          if manifest.get("short_name") != "DoLP v0.778":
+              raise SystemExit("Manifest short name is not v0.778")
+          if (site / "version.txt").read_text(encoding="utf-8") != "DoLP v0.778 · Aoki Utage + Mysterious · ML v2.101.1\n":
+              raise SystemExit("version.txt is not the exact v0.778 edition marker")
+          if json.loads((site / "modList.json").read_text(encoding="utf-8")) != []:
+              raise SystemExit("modList.json is not the safe empty remote-Mod list")
+
+          story_bytes = upstream_story.encode("utf-8")
+          report = {
+              "result": "pass",
+              "version": "DoLP v0.778",
+              "core": "0.5.12.11 DoLP v0.778",
+              "edition": "Aoki Utage + Mysterious",
+              "activeVersionLine": exact_version_line,
+              "package": {
+                  "bytes": package_path.stat().st_size,
+                  "sha256": sha256_file(package_path),
+                  "matchesPinnedV0778": True,
+              },
+              "gameHtml": {
+                  "bytes": upstream_path.stat().st_size,
+                  "sha256": sha256_file(upstream_path),
+                  "matchesPinnedV0778": True,
+              },
+              "storyData": {
+                  "bytes": len(story_bytes),
+                  "sha256": hashlib.sha256(story_bytes).hexdigest(),
+                  "byteIdenticalToOfficialV0778": True,
+                  "officialHistoryMentions": {
+                      "DoLP v0.772": upstream_story.count("DoLP v0.772"),
+                      "DoLP v0.775": upstream_story.count("DoLP v0.775"),
+                  },
+              },
+              "modLoader": {
+                  "version": "ML v2.101.1",
+                  "targetCore": "0.5.12.11",
+                  "archiveSha256": sha256_file(build / "modloader.zip"),
+                  "officialBlocks": 2,
+                  "eachBlockOccursOnce": True,
+                  "sugarCubeEngines": 1,
+              },
+              "images": {
+                  "files": len(published_images),
+                  "bytes": published_image_bytes,
+                  "manifestSha256": published_image_manifest_sha,
+                  "sourceManifestSha256": source_image_manifest_sha,
+                  "byteIdenticalToOfficialV0778": True,
+              },
+              "publishedTree": {
+                  "rootEntriesBeforeAuditReport": root_entries,
+                  "legacyVersionPaths": legacy_paths,
+                  "legacyActiveShellMarkers": legacy_shell_hits,
+              },
+          }
+          (site / "content-audit.json").write_text(
+              json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, ensure_ascii=False, indent=2))
           PY
 
       - name: Run the ModLoader in a mobile browser smoke test
@@ -568,6 +813,7 @@ jobs:
           test -s "$SITE_DIR/index.html"
           test -d "$SITE_DIR/img"
           test -s "$SITE_DIR/build-info.json"
+          test -s "$SITE_DIR/content-audit.json"
           test -s "$SITE_DIR/manifest.json"
           test -s "$SITE_DIR/apple-touch-icon.png"
           test ! -e "$SITE_DIR/sw.js"
@@ -578,12 +824,14 @@ jobs:
           grep -aFq 'window.mainStart' "$SITE_DIR/index.html"
           grep -aFq 'data-dolp-pwa-v0778' "$SITE_DIR/index.html"
           python3 -m json.tool "$SITE_DIR/build-info.json" >/dev/null
+          python3 -m json.tool "$SITE_DIR/content-audit.json" >/dev/null
+          test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["result"])' "$SITE_DIR/content-audit.json")" = "pass"
           python3 -m json.tool "$SITE_DIR/manifest.json" >/dev/null
 
           HTML_BYTES="$(stat -c '%s' "$SITE_DIR/index.html")"
           IMAGE_FILES="$(find "$SITE_DIR/img" -type f | wc -l)"
           test "$HTML_BYTES" -lt 99000000
-          test "$IMAGE_FILES" -gt 30000
+          test "$IMAGE_FILES" = "$EXPECTED_IMAGE_FILES"
 
       - name: Replace the gh-pages branch contents
         shell: bash
