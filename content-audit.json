@@ -31,27 +31,6 @@
     "eachBlockOccursOnce": true,
     "sugarCubeEngines": 1
   },
-  "translation": {
-    "language": "zh-TW",
-    "conversion": "OpenCC s2twp",
-    "source": "https://github.com/NumberSir/DoL-I18n-Build/releases/download/0.5.12.11-chs-auto-nightly-auto--d230276d3f0390986e385a5b924c286769bcab1a/ModI18N-0.5.12.11-chs-auto-nightly.mod.zip",
-    "sourceSha256": "e43a5c79847b20854cd1181ed8b010ee96ea2609167e5f927c442ba8cbdd7124",
-    "sourceVersion": "0.5.12.11-chs-auto-nightly",
-    "targetVersion": "v0.5.12.11-zhtw-1.0.1",
-    "targetFile": "ModI18N-0.5.12.11-zhtw.mod.zip",
-    "targetBytes": 13563709,
-    "targetSha256": "c20babbf788707fd5fef92e3a83adec2ad751ba920649606d7049991156f5845",
-    "translationEntries": 198095,
-    "compatibleEntries": 197090,
-    "incompatibleEntriesOmitted": 1005,
-    "positionsAdaptedForDoLP": 78973,
-    "translatedTargets": 196999,
-    "targetsChangedToTraditional": 182313,
-    "startControl": "開始遊戲！",
-    "license": "CC BY-NC-SA 4.0",
-    "licenseUrl": "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/blob/main/LICENSE",
-    "attributionIncluded": true
-  },
   "images": {
     "files": 31349,
     "bytes": 143622449,
@@ -69,7 +48,6 @@
       "index.html",
       "manifest.json",
       "modList.json",
-      "mods",
       "style.css",
       "usettings.js",
       "version.txt"

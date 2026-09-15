@@ -8,8 +8,8 @@
   "packageSha256": "67e21e9615d94783df26c3e1dfebf51840cb68278e419606ea69052564a0da51",
   "upstreamHtmlBytes": 57188965,
   "upstreamHtmlSha256": "6144728ebb7d47ddc2ee861281ddfadd161d1bf67babf6cc59510de1a28ca6ef",
-  "publishedHtmlBytes": 71650338,
-  "publishedHtmlSha256": "99de0f642ca50b5e9e63fed0967e8d0b284bcdfb97350f1e208a55d0846635cd",
+  "publishedHtmlBytes": 71650331,
+  "publishedHtmlSha256": "bde108e286773697fb9f558f33819531e1fdeb9a230c730565c9ae55295265c7",
   "imageFiles": 31349,
   "imageBytes": 143622449,
   "modLoader": "ML v2.101.1",
@@ -29,29 +29,7 @@
     "mergedHtmlBytes": 71649528,
     "mergedHtmlSha256": "71f059154aed17db2ea01460f2826766e0a66ff998f48f7da83dd5a4309bcfd1"
   },
-  "language": "zh-TW",
-  "translation": {
-    "language": "zh-TW",
-    "conversion": "OpenCC s2twp",
-    "source": "https://github.com/NumberSir/DoL-I18n-Build/releases/download/0.5.12.11-chs-auto-nightly-auto--d230276d3f0390986e385a5b924c286769bcab1a/ModI18N-0.5.12.11-chs-auto-nightly.mod.zip",
-    "sourceSha256": "e43a5c79847b20854cd1181ed8b010ee96ea2609167e5f927c442ba8cbdd7124",
-    "sourceVersion": "0.5.12.11-chs-auto-nightly",
-    "targetVersion": "v0.5.12.11-zhtw-1.0.1",
-    "targetFile": "ModI18N-0.5.12.11-zhtw.mod.zip",
-    "targetBytes": 13563709,
-    "targetSha256": "c20babbf788707fd5fef92e3a83adec2ad751ba920649606d7049991156f5845",
-    "translationEntries": 198095,
-    "compatibleEntries": 197090,
-    "incompatibleEntriesOmitted": 1005,
-    "positionsAdaptedForDoLP": 78973,
-    "translatedTargets": 196999,
-    "targetsChangedToTraditional": 182313,
-    "startControl": "開始遊戲！",
-    "license": "CC BY-NC-SA 4.0",
-    "licenseUrl": "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/blob/main/LICENSE",
-    "attributionIncluded": true
-  },
   "deployment": "direct index.html with ModLoader; no Service Worker or compressed web launcher",
-  "sourceCommit": "028918ffdfcf3187f6dd37e12740e8b54e680d77",
-  "publishedAt": "2026-09-15T17:00:56.931941+00:00"
+  "sourceCommit": "a36ee04aa8ef3220d96031fab9f8a0e19eac7db1",
+  "publishedAt": "2026-09-15T17:26:55.193601+00:00"
 }
