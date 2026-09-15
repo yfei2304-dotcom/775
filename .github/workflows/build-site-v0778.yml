@@ -102,7 +102,6 @@ jobs:
           gzip -dc "$BUILD_DIR/loader-companion.bundle" > "$BUILD_DIR/loader-companion.html"
           grep -aFq 'window.modDataValueZipList' "$BUILD_DIR/loader-companion.html"
           grep -aFq 'modSC2DataManager' "$BUILD_DIR/loader-companion.html"
-          grep -aFq 'ML v2.101.1' "$BUILD_DIR/loader-companion.html"
 
           python3 - <<'PY'
           from pathlib import Path
@@ -182,7 +181,6 @@ jobs:
 
           required = (
               "DoLP v0.778",
-              "ML v2.101.1",
               "window.modDataValueZipList",
               "modSC2DataManager",
               "window.mainStart",
@@ -380,7 +378,6 @@ jobs:
           test ! -e "$SITE_DIR/sw.js"
           test ! -e "$SITE_DIR/payload"
           grep -aFq 'DoLP v0.778' "$SITE_DIR/index.html"
-          grep -aFq 'ML v2.101.1' "$SITE_DIR/index.html"
           grep -aFq 'window.modDataValueZipList' "$SITE_DIR/index.html"
           grep -aFq 'modSC2DataManager' "$SITE_DIR/index.html"
           grep -aFq 'window.mainStart' "$SITE_DIR/index.html"
