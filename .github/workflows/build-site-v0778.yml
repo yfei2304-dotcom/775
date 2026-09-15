@@ -925,6 +925,12 @@ jobs:
               raise SystemExit("The published zh-TW ModI18N hash is wrong")
           if translation_info.get("translationEntries") != 198095:
               raise SystemExit("The zh-TW ModI18N translation entry count is wrong")
+          if translation_info.get("compatibleEntries") != 197090:
+              raise SystemExit("The zh-TW ModI18N DoLP-compatible entry count is wrong")
+          if translation_info.get("incompatibleEntriesOmitted") != 1005:
+              raise SystemExit("The zh-TW ModI18N incompatible entry count is wrong")
+          if translation_info.get("positionsAdaptedForDoLP") != 78973:
+              raise SystemExit("The zh-TW ModI18N adapted-position count is wrong")
           if translation_info.get("translatedTargets") != 196999:
               raise SystemExit("The zh-TW ModI18N translated target count is wrong")
           if translation_info.get("targetsChangedToTraditional", 0) < 100000:
@@ -938,7 +944,7 @@ jobs:
               if not {"boot.json", "i18n.json", "ATTRIBUTION.zh-TW.md"}.issubset(names):
                   raise SystemExit("The published zh-TW ModI18N has an incomplete archive tree")
               boot = json.loads(archive.read("boot.json").decode("utf-8"))
-              if boot.get("name") != "ModI18N" or boot.get("version") != "v0.5.12.11-zhtw-1.0.0":
+              if boot.get("name") != "ModI18N" or boot.get("version") != "v0.5.12.11-zhtw-1.0.1":
                   raise SystemExit("The published zh-TW ModI18N boot metadata is wrong")
               translated_i18n = archive.read("i18n.json").decode("utf-8")
               if "開始遊戲！" not in translated_i18n or "开始游戏！" in translated_i18n:
