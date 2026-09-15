@@ -171,18 +171,19 @@ jobs:
           companion = (build / "loader-companion.html").read_text(encoding="utf-8-sig")
 
           script_pattern = re.compile(r"<script\b[^>]*>[\s\S]*?</script>", re.IGNORECASE)
-          loader_blocks = []
-          seen_hashes = set()
-          for match in script_pattern.finditer(companion):
-              block = match.group(0)
-              if "window.modDataValueZipList" in block or "modSC2DataManager" in block:
-                  digest = hashlib.sha256(block.encode("utf-8")).hexdigest()
-                  if digest not in seen_hashes:
-                      seen_hashes.add(digest)
-                      loader_blocks.append(block)
+          companion_scripts = [match.group(0) for match in script_pattern.finditer(companion)]
+          if len(companion_scripts) < 2:
+              raise SystemExit(f"Expected the two leading ModLoader blocks, found {len(companion_scripts)} scripts")
 
-          if len(loader_blocks) < 3:
-              raise SystemExit(f"Expected at least 3 ModLoader blocks, found {len(loader_blocks)}")
+          # The official ModLoader output starts with exactly two injected blocks.
+          # Later scripts include the already-patched SugarCube engine and must not
+          # be copied, or SugarCube initializes twice and corrupts State.prng.
+          loader_blocks = companion_scripts[:2]
+          if "window.modDataValueZipList" not in loader_blocks[0]:
+              raise SystemExit("Official ModLoader block 1 is not modDataValueZipList")
+          if "modSC2DataManager" not in loader_blocks[1] or "jsPreloader" not in loader_blocks[1]:
+              raise SystemExit("Official ModLoader block 2 is not the BeforeSC2 runtime")
+
           if "window.modDataValueZipList" in official or "modSC2DataManager" in official:
               raise SystemExit("The v0.778 upstream HTML unexpectedly already contains ModLoader")
 
@@ -498,7 +499,7 @@ jobs:
             let labelWaitError = null;
             try {
               await page.waitForFunction(
-                () => document.body.innerText.includes("ML v2.101.1"),
+                () => document.body.innerText.includes("ML-v2.101.1"),
                 null,
                 { timeout: 180000, polling: 500 }
               );
@@ -511,13 +512,15 @@ jobs:
               const versionLines = text
                 .split("\n")
                 .map(line => line.trim())
-                .filter(line => /DoLP v0\.778|ML v2\.101\.1|ModLoader/i.test(line));
+                .filter(line => /DoLP v0\.778|ML[- ]v2\.101\.1|ModLoader/i.test(line));
               return {
                 title: document.title,
                 readyState: document.readyState,
                 versionLines,
                 hasV0778: text.includes("0.5.12.11 DoLP v0.778"),
-                hasModLoaderLabel: text.includes("ML v2.101.1"),
+                hasModLoaderLabel: text.includes("ML-v2.101.1"),
+                hasExactVersionLine: text.includes("0.5.12.11 DoLP v0.778 -(ML-v2.101.1)"),
+                hasPrngError: text.includes("reading 'prng'"),
                 hasManager: typeof window.modSC2DataManager !== "undefined",
                 hasPreloader: typeof window.jsPreloader !== "undefined",
                 embeddedModZipCount: Array.isArray(window.modDataValueZipList)
@@ -530,9 +533,14 @@ jobs:
               };
             });
 
-            console.log(JSON.stringify({ state, labelWaitError, pageErrors, consoleErrors }, null, 2));
+            const fatalConsoleErrors = consoleErrors.filter(message =>
+              /prng|Cannot redefine property|initI10n is not a function/i.test(message)
+            );
+            console.log(JSON.stringify({ state, labelWaitError, pageErrors, consoleErrors, fatalConsoleErrors }, null, 2));
             if (!state.hasV0778) throw new Error("v0.778 core label did not render");
-            if (!state.hasModLoaderLabel) throw new Error("ML v2.101.1 label did not render");
+            if (!state.hasModLoaderLabel) throw new Error("ML-v2.101.1 label did not render");
+            if (!state.hasExactVersionLine) throw new Error("The combined DoLP/ModLoader version line did not render");
+            if (state.hasPrngError) throw new Error("The game rendered a State.prng startup error");
             if (!state.hasManager) throw new Error("modSC2DataManager is unavailable");
             if (!state.hasPreloader) throw new Error("jsPreloader is unavailable");
             if (state.embeddedModZipCount < 1) throw new Error("Embedded Mod ZIP list is empty");
@@ -541,6 +549,9 @@ jobs:
             }
             if (pageErrors.length) {
               throw new Error("Browser page errors: " + pageErrors.join(" | "));
+            }
+            if (fatalConsoleErrors.length) {
+              throw new Error("Fatal console errors: " + fatalConsoleErrors.join(" | "));
             }
 
             await browser.close();
