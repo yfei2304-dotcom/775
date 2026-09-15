@@ -4,9 +4,9 @@ This repository publishes a directly playable iPhone/Safari build of **DoLP v0.7
 
 ## Play
 
-https://yfei2304-dotcom.github.io/775/
+https://yfei2304-dotcom.github.io/778/
 
-The published game is v0.778. The repository URL remains `775` until the GitHub repository itself is renamed in Settings.
+The repository and public URL use `778`, matching the published game version.
 
 ## Sources
 
@@ -24,8 +24,8 @@ The game is published directly as `index.html`. It does not depend on the obsole
 
 Generated provenance and ModLoader installation details:
 
-https://yfei2304-dotcom.github.io/775/build-info.json
+https://yfei2304-dotcom.github.io/778/build-info.json
 
 The full content audit verifies that the Twine story data and all 31,349 images are byte-identical to the pinned official v0.778 package, and that the two ModLoader blocks match the official core 0.5.12.11 build:
 
-https://yfei2304-dotcom.github.io/775/content-audit.json
+https://yfei2304-dotcom.github.io/778/content-audit.json
