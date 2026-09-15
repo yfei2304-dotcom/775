@@ -26,7 +26,7 @@ Pinned community Chinese localization for core `0.5.12.11`:
 
 `https://github.com/NumberSir/DoL-I18n-Build/releases/download/0.5.12.11-chs-auto-nightly-auto--d230276d3f0390986e385a5b924c286769bcab1a/ModI18N-0.5.12.11-chs-auto-nightly.mod.zip`
 
-The source localization archive is verified against SHA-256 `e43a5c79847b20854cd1181ed8b010ee96ea2609167e5f927c442ba8cbdd7124`. Its translated text is converted with OpenCC `s2twp`; the English match fields, Twine macros, program identifiers, entry order, and exact `0.5.12.11` dependency remain unchanged. Attribution and modification details are included inside the generated Mod archive.
+The source localization archive is verified against SHA-256 `e43a5c79847b20854cd1181ed8b010ee96ea2609167e5f927c442ba8cbdd7124`. Its translated text is converted with OpenCC `s2twp`; the English match strings, Twine macros, program identifiers, entry order, and exact `0.5.12.11` dependency remain unchanged. The workflow then resolves each rule against the exact DoLP v0.778 passages and scripts: 197,090 of 198,095 rules are retained with exact positions, while 1,005 rules whose English source no longer exists are omitted instead of rolling back otherwise compatible passages. Attribution and modification details are included inside the generated Mod archive.
 
 The Traditional Chinese adaptation is distributed under the source project's [CC BY-NC-SA 4.0 license](https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/blob/main/LICENSE). It is an unofficial adaptation and does not imply endorsement by the localization team.
 
